@@ -18,17 +18,15 @@ https://script.google.com/home/usersettings からGoogle Apps Script APIをオ�
 
 1. 以下のシェルを実行. GoogleDrive上に `Github-gas-four-keys` というスプレッドシートが作成されます.
 ```sh
-npm install @google/clasp -g
-
 git clone https://github.com/cosoji-jp/github-gas-four-keys.git
 cd github-gas-four-keys
-npm init -y
+npm install
 
 # ブラウザでGoogleアカウントのログインが求められます.
-clasp login
+npx clasp login
 # ログインしたアカウントのGoogleDriveのマイドライブのルートにSpreadsheetが作成されます.
-clasp create --type sheets
-clasp push
+npx clasp create --type sheets
+npx clasp push
 ```
 
 2. GoogleDrive上に `Github-gas-four-keys` という名前のスプレッドシートが作られます.
