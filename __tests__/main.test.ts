@@ -3,7 +3,8 @@ import { PullRequest } from '../types/main';
 
 const mockSpreadsheetApp: GoogleAppsScript.Spreadsheet.SpreadsheetApp = {
   getActiveSpreadsheet: jest.fn().mockReturnValue({
-  }),
+		getSheetByName: jest.fn(),
+	}),
   newConditionalFormatRule: jest.fn().mockReturnValue({
     whenTextEqualTo: jest.fn().mockReturnThis(),
     setBackground: jest.fn().mockReturnThis(),
@@ -53,8 +54,9 @@ global.UrlFetchApp = mockUrlFetchApp;
 // テスト対象のコードをインポート
 import {
   getPullRequests,
-//   getAllRepos,
+  getAllRepos,
 } from '../main';
+import { mock } from 'node:test';
 
 describe('getPullRequests', () => {
   beforeEach(() => {
@@ -192,52 +194,59 @@ describe('getPullRequests', () => {
 
 });
 
-// describe('getAllRepos', () => {
-//   beforeEach(() => {
-//     jest.clearAllMocks();
-//   });
+describe('getAllRepos', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
 
-//   test('全リポジトリのPRを取得してスプレッドシートに書き込む', () => {
-//     const mockSheet = {
-//       getRange: jest.fn().mockReturnValue({
-//         setValue: jest.fn()
-//       })
-//     };
-//     (mockSpreadsheetApp.getActiveSpreadsheet().getSheetByName as jest.Mock).mockReturnValue(mockSheet);
+  });
 
-//     const mockPRResponse = {
-//       getContentText: () => JSON.stringify({
-//         data: {
-//           repository: {
-//             pullRequests: {
-//               pageInfo: {
-//                 hasNextPage: false
-//               },
-//               nodes: [{
-//                 author: { login: 'testUser' },
-//                 headRefName: 'feature/test',
-//                 bodyText: 'Test PR',
-//                 merged: true,
-//                 mergedAt: '2024-01-01T00:00:00Z',
-//                 commits: {
-//                   nodes: [{
-//                     commit: {
-//                       committedDate: '2024-01-01T00:00:00Z'
-//                     }
-//                   }]
-//                 }
-//               }]
-//             }
-//           }
-//         }
-//       })
-//     };
+  test('全リポジトリのPRを取得してスプレッドシートに書き込む', () => {
+		const mockSetValue = jest.fn();
+    const mockSheet = {
+      getRange: jest.fn().mockReturnValue({
+        setValue: mockSetValue
+      })
+    };
+    (mockSpreadsheetApp.getActiveSpreadsheet().getSheetByName as jest.Mock).mockReturnValue(mockSheet);
 
-//     (mockUrlFetchApp.fetch as jest.Mock).mockReturnValue(mockPRResponse);
+    const mockPRResponse = {
+      getContentText: () => JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: {
+                hasNextPage: false
+              },
+              nodes: [{
+                author: { login: 'testUser' },
+                headRefName: 'feature/test',
+                bodyText: 'Test PR',
+                merged: true,
+                mergedAt: '2024-01-01T00:00:00Z',
+                commits: {
+                  nodes: [{
+                    commit: {
+                      committedDate: '2024-01-01T00:00:00Z'
+                    }
+                  }]
+                }
+              }]
+            }
+          }
+        }
+      })
+    };
 
-//     getAllRepos();
+		const fetchFn = mockUrlFetchApp.fetch as jest.Mock;
+    fetchFn.mockReturnValue(mockPRResponse);
 
-//     expect(mockSheet.getRange).toHaveBeenCalled();
-//     expect(mockUrlFetchApp.fetch).toHaveBeenCalled();
-//   });
-// });
+    getAllRepos();
+
+    expect(mockUrlFetchApp.fetch).toHaveBeenCalled();
+		expect((fetchFn.mock.calls[0][1] as any).payload).toContain('repository(name: \\\"repo1\\\"');
+		expect((fetchFn.mock.calls[1][1] as any).payload).toContain('repository(name: \\\"repo2\\\"');
+
+    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(20);
+    expect(mockSetValue.mock.calls.length).toBe(20);
+  });
+});

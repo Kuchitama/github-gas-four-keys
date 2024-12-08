@@ -312,4 +312,4 @@ function getOrCreateSheet(sheetName) {
 }
 
 // Export functions for testing
-module.exports = { getPullRequests };
+module.exports = { getAllRepos, getPullRequests };
