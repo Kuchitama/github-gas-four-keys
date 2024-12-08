@@ -103,6 +103,93 @@ describe('getPullRequests', () => {
       expect.any(Object)
     );
   });
+
+	test('100件以上のPRを取得する場合', async () => {
+    const mockPRData: PullRequest[] = Array.from({length: 100}).map((_, i: number) => {
+			const updatedDate = new Date()
+			updatedDate.setDate(updatedDate.getDate() - 100 + i);
+
+			return {
+				author: { login: 'testUser' },
+				headRefName: 'feature/test',
+				bodyText: 'Test PR',
+				merged: true,
+				mergedAt: updatedDate.toISOString(),
+				commits: {
+					nodes: [{
+						commit: {
+							committedDate: updatedDate.toISOString()
+						}
+					}]
+				}
+			}
+    });
+
+    const mockResponse1 = {
+      getContentText: () => JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: {
+                hasNextPage: true,
+								endCursor: 100,
+              },
+              nodes: mockPRData
+            }
+          }
+        }
+      })
+    };
+		const mockResponse2 = {
+      getContentText: () => JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: {
+                hasNextPage: false,
+              },
+              nodes: [{
+								author: { login: 'testUser' },
+								headRefName: 'feature/test',
+								bodyText: 'Test PR',
+								merged: true,
+								mergedAt: new Date().toISOString(),
+								commits: {
+									nodes: [{
+										commit: {
+											committedDate: new Date().toISOString()
+										}
+									}]
+								}
+							}] 
+            }
+          }
+        }
+      })
+    };
+
+
+		const fetchFn = (mockUrlFetchApp.fetch as jest.Mock)
+    fetchFn.mockReturnValueOnce(mockResponse1);
+		fetchFn.mockReturnValueOnce(mockResponse2);
+
+    const result = getPullRequests('test-repo');
+
+
+		// Check the number of fetch calls
+		expect(fetchFn.mock.calls).toHaveLength(2);
+
+		expect((fetchFn.mock.calls[0][1] as any).payload).not.toContain('after:');
+		expect((fetchFn.mock.calls[1][1] as any).payload).toContain('after: \\\"100\\\"');
+
+    expect(result).toHaveLength(101);
+    expect(result[0].author.login).toBe('testUser');
+    expect(mockUrlFetchApp.fetch).toHaveBeenCalledWith(
+      'https://api.github.com/graphql',
+      expect.any(Object)
+    );
+  });
+
 });
 
 // describe('getAllRepos', () => {
