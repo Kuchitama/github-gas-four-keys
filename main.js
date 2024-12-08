@@ -309,3 +309,6 @@ function formatDate(date) {
 function getOrCreateSheet(sheetName) {
   return defaultSheet.getSheetByName(sheetName) || defaultSheet.insertSheet(sheetName);
 }
+
+// Export functions for testing
+module.exports = { getAllRepos, getPullRequests };
