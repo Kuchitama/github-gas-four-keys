@@ -1,3 +1,4 @@
+// /main.js
 const githubEndpoint = "https://api.github.com/graphql";
 
 const repositoryNames = JSON.parse(PropertiesService.getScriptProperties().getProperty("GITHUB_REPO_NAMES"));
@@ -309,3 +310,6 @@ function formatDate(date) {
 function getOrCreateSheet(sheetName) {
   return defaultSheet.getSheetByName(sheetName) || defaultSheet.insertSheet(sheetName);
 }
+
+// Export functions for testing
+module.exports = { getPullRequests };
