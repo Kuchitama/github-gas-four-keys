@@ -1,4 +1,3 @@
-// /main.js
 const githubEndpoint = "https://api.github.com/graphql";
 
 const repositoryNames = JSON.parse(PropertiesService.getScriptProperties().getProperty("GITHUB_REPO_NAMES"));
