@@ -10,7 +10,7 @@ function initialize() {
 
   const pullRequestsSheetName = "プルリク情報";
   const pullRequestsSheet = getOrCreateSheet(pullRequestsSheetName);
-  pullRequestsSheet.getRange(1, 1, 1, 10)
+  pullRequestsSheet.getRange(1, 1, 1, 11)
     .setValues([[
       "メンバー名",
       "ブランチ名",
@@ -22,6 +22,7 @@ function initialize() {
       "リポジトリ",
       "障害発生判定",
       "障害対応PR",
+      "更新日時"
     ]])
     .setBackgroundRGB(224, 224, 224);
 
@@ -205,10 +206,16 @@ function getAllRepos() {
 
   let i = 0;
   repositoryNames.forEach((repositoryName) => {
-    const pullRequests = getPullRequests(repositoryName);
-
+    // ToDo: Get latest updatedAt
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(`プルリク情報`);
+
+    const updates = sheet.getRange(`K2:K`).getValues()[0].filter(v => v !== null || v  !== undefined || v !== '');
+
+    const latestUpdated = (updates.length > 0) ? new Date(updates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]) : null; 
+    console.log(`get PRs from ${latestUpdated.toISOString()}`);
+    const pullRequests =  getPullRequests(repositoryName, latestUpdated);
+
     for (const pullRequest of pullRequests) {
 
       let firstCommitDate = null;
@@ -219,6 +226,7 @@ function getAllRepos() {
       if (pullRequest.mergedAt) {
         mergedAt = new Date(pullRequest.mergedAt);
       }
+      const updatedAt = new Date(pullRequest.updatedAt);
       const index = i + 2;
       sheet.getRange(index, 1).setValue(pullRequest.author.login);
       sheet.getRange(index, 2).setValue(pullRequest.headRefName);
@@ -233,13 +241,15 @@ function getAllRepos() {
       sheet.getRange(index, 8).setValue(repositoryName);
       sheet.getRange(index, 9).setValue(`=REGEXMATCH(B${index}, '分析設定'!$E$3)`);
       sheet.getRange(index, 10).setValue(`=REGEXMATCH(B${index}, '分析設定'!$E$4)`);
+      sheet.getRange(index, 11).setValue(formatDate(updatedAt));
 
       i++;
     }
   });
 }
 
-function getPullRequests(repositoryName) {
+function getPullRequests(repositoryName, updatedFrom = null) {
+  const  fetchSizeLimit = 100
   /*
    指定したリポジトリから全てのPRを抽出する.
   */
@@ -248,7 +258,7 @@ function getPullRequests(repositoryName) {
   while (true) {
     const graphql = `query{
       repository(name: "${repositoryName}", owner: "${repositoryOwner}"){
-        pullRequests (first: 100 ${after}) {
+        pullRequests (first: ${fetchSizeLimit} ${after}, orderBy: {field: UPDATED_AT, direction: DESC}) {
           pageInfo {
             startCursor
             hasNextPage
@@ -269,6 +279,7 @@ function getPullRequests(repositoryName) {
                 }
               }
             }
+            updatedAt
           }
         }
       }
@@ -283,8 +294,15 @@ function getPullRequests(repositoryName) {
     };
     const res = UrlFetchApp.fetch(githubEndpoint, option);
     const json = JSON.parse(res.getContentText());
-    resultPullRequests = resultPullRequests.concat(json.data.repository.pullRequests.nodes)
-    if (!json.data.repository.pullRequests.pageInfo.hasNextPage) {
+    // filter by updatedAt with updatedFrom
+    let updatedRequests = json.data.repository.pullRequests.nodes; 
+    
+    if (updatedFrom !== null) {
+      updatedRequests = updatedRequests.filter((node, i) => (new Date(node.updatedAt).getTime() - updatedFrom.getTime()) > 0);
+    }
+
+    resultPullRequests = resultPullRequests.concat(updatedRequests);
+    if (updatedRequests.length < fetchSizeLimit || !json.data.repository.pullRequests.pageInfo.hasNextPage) {
       break;
     }
     after = ', after: "' + json.data.repository.pullRequests.pageInfo.endCursor + '"';

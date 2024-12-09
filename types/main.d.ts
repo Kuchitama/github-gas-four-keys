@@ -13,6 +13,7 @@ interface PullRequest {
       };
     }>;
   };
+  updatedAt: string;
 }
 
 export { PullRequest };
