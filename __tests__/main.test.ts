@@ -53,6 +53,7 @@ describe('getPullRequests', () => {
 
   test('正常にPRを取得できる場合', async () => {
     const mockPRData: PullRequest = {
+      id: 1,
       author: { login: 'testUser' },
       headRefName: 'feature/test',
       bodyText: 'Test PR',
@@ -101,6 +102,7 @@ describe('getPullRequests', () => {
 			updatedDate.setDate(updatedDate.getDate() - i);
 
 			return {
+        id: 101 - i,
 				author: { login: 'testUser' },
 				headRefName: 'feature/test',
 				bodyText: 'Test PR',
@@ -193,6 +195,7 @@ describe('getPullRequests', () => {
                 hasNextPage: false
               },
               nodes: [{
+                id: 1,
                 author: { login: 'testUser' },
                 headRefName: 'feature/test',
                 bodyText: 'Test PR',
@@ -207,6 +210,7 @@ describe('getPullRequests', () => {
                 },
                 updatedAt: '2024-01-01T00:00:00Z',
               }, {
+                id: 2,
                 author: { login: 'testUser' },
                 headRefName: 'feature/test',
                 bodyText: 'Test PR',
@@ -245,6 +249,7 @@ describe('getPullRequests', () => {
 			updatedDate.setDate(updatedDate.getDate() - i);
 
 			return {
+        id: 101 - i,
 				author: { login: 'testUser' },
 				headRefName: 'feature/test',
 				bodyText: 'Test PR',
@@ -346,8 +351,8 @@ describe('getAllRepos', () => {
 		expect((fetchFn.mock.calls[0][1] as any).payload).toContain('repository(name: \\\"repo1\\\"');
 		expect((fetchFn.mock.calls[1][1] as any).payload).toContain('repository(name: \\\"repo2\\\"');
 
-    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(24);
-    expect(mockSetValue.mock.calls.length).toBe(22);
+    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(28);
+    expect(mockSetValue.mock.calls.length).toBe(24);
   });
 
   test('PRの最終更新日時を考慮してPRを取り込む', () => {
@@ -404,7 +409,7 @@ describe('getAllRepos', () => {
     expect(mockUrlFetchApp.fetch).toHaveBeenCalled();
 		expect((fetchFn.mock.calls[0][1] as any).payload).toContain('repository(name: \\\"repo1\\\"');
 
-    // 最終更新日時='2024-01-01T00:00:00Z' として、それ以降の1件のみ更新する = setValue は 22回実行
-    expect(mockSetValue.mock.calls.length).toBe(22);
+    // 最終更新日時='2024-01-01T00:00:00Z' として、それ以降の1件のみ更新する
+    expect(mockSetValue.mock.calls.length).toBe(24);
   });
 });

@@ -10,7 +10,7 @@ function initialize() {
 
   const pullRequestsSheetName = "プルリク情報";
   const pullRequestsSheet = getOrCreateSheet(pullRequestsSheetName);
-  pullRequestsSheet.getRange(1, 1, 1, 11)
+  pullRequestsSheet.getRange(1, 1, 1, 12)
     .setValues([[
       "メンバー名",
       "ブランチ名",
@@ -22,7 +22,8 @@ function initialize() {
       "リポジトリ",
       "障害発生判定",
       "障害対応PR",
-      "更新日時"
+      "更新日時",
+      "id",
     ]])
     .setBackgroundRGB(224, 224, 224);
 
@@ -210,42 +211,75 @@ function getAllRepos() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(`プルリク情報`);
 
-    const updates = sheet.getRange(`K2:K`).getValues()[0].filter(v => v !== null || v  !== undefined || v !== '');
+    const updates = getVerticalValues(sheet, 'K', { head: 2 , last: 0});
 
     const latestUpdated = (updates.length > 0) ? new Date(updates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]) : null; 
-    console.log(`get PRs from ${latestUpdated.toISOString()}`);
+    if ( latestUpdated === null ) {
+      console.log(`get all PRs`);
+    } else {
+      console.log(`get PRs from ${latestUpdated.toISOString()}`);
+    }
     const pullRequests =  getPullRequests(repositoryName, latestUpdated);
 
     for (const pullRequest of pullRequests) {
+      // Upsert rows by pullRequest
+      const prIds = sheet.getRange("L2:L").getValues().map((vs, _) => vs[0]);
 
-      let firstCommitDate = null;
-      if (pullRequest.commits.nodes[0].commit.committedDate) {
-        firstCommitDate = new Date(pullRequest.commits.nodes[0].commit.committedDate);
-      }
-      let mergedAt = null;
-      if (pullRequest.mergedAt) {
-        mergedAt = new Date(pullRequest.mergedAt);
-      }
-      const updatedAt = new Date(pullRequest.updatedAt);
-      const index = i + 2;
-      sheet.getRange(index, 1).setValue(pullRequest.author.login);
-      sheet.getRange(index, 2).setValue(pullRequest.headRefName);
-      sheet.getRange(index, 3).setValue(pullRequest.bodyText);
-      sheet.getRange(index, 4).setValue(pullRequest.merged);
-      sheet.getRange(index, 5).setValue(!!firstCommitDate ? formatDate(firstCommitDate) : "");
-      sheet.getRange(index, 6).setValue(!!mergedAt ? formatDate(mergedAt) : "");
-      sheet.getRange(index, 7).setValue(
-        (!!firstCommitDate && !!mergedAt) ?
-        (mergedAt.getTime() - firstCommitDate.getTime()) / 60 / 60 / 1000 :
-        "");
-      sheet.getRange(index, 8).setValue(repositoryName);
-      sheet.getRange(index, 9).setValue(`=REGEXMATCH(B${index}, '分析設定'!$E$3)`);
-      sheet.getRange(index, 10).setValue(`=REGEXMATCH(B${index}, '分析設定'!$E$4)`);
-      sheet.getRange(index, 11).setValue(formatDate(updatedAt));
+      const last = prIds.filter((id, _) => id !== null && id !== undefined && id !== "").length;
+
+      const index = prIds.findIndex((id, _) => id === `${repositoryName}/${pullRequest.number}`);
+      const row = index > 0 ? index + 2: last + 2;
+
+      upsertPullRequestData(pullRequest, sheet, row, repositoryName);
 
       i++;
     }
   });
+}
+
+/** 
+ * get vertical values array from range(Value[n][0]) 
+ * args 
+ *    sheet: GoogleAppsScript.Spreadsheet.SpreadsheetApp
+ *    colChar: column index. e.g. 'A'
+ *    opt: Row range option.
+ * return Value[]
+*/
+function getVerticalValues(sheet, colChar, opt={head: 0, last:0}) {
+  const head = opt.head || 0;
+  const last = opt.last || 0;
+  const start = head === 0 ? colChar : `${colChar}${head}`;
+  const end = last <= 0 ? colChar : `${colChar}${last}`
+
+  return sheet.getRange(`${start}:${end}`).getValues().map((vs, _) => vs[0]);
+}
+
+function upsertPullRequestData(pullRequest, sheet, row, repositoryName) {
+  let firstCommitDate = null;
+  if (pullRequest.commits.nodes[0].commit.committedDate) {
+    firstCommitDate = new Date(pullRequest.commits.nodes[0].commit.committedDate);
+  }
+  let mergedAt = null;
+  if (pullRequest.mergedAt) {
+    mergedAt = new Date(pullRequest.mergedAt);
+  }
+
+  const updatedAt = new Date(pullRequest.updatedAt);
+  sheet.getRange(row, 1).setValue(pullRequest.author.login);
+  sheet.getRange(row, 2).setValue(pullRequest.headRefName);
+  sheet.getRange(row, 3).setValue(pullRequest.bodyText);
+  sheet.getRange(row, 4).setValue(pullRequest.merged);
+  sheet.getRange(row, 5).setValue(!!firstCommitDate ? formatDate(firstCommitDate) : "");
+  sheet.getRange(row, 6).setValue(!!mergedAt ? formatDate(mergedAt) : "");
+  sheet.getRange(row, 7).setValue(
+    (!!firstCommitDate && !!mergedAt) ?
+      (mergedAt.getTime() - firstCommitDate.getTime()) / 60 / 60 / 1000 :
+      "");
+  sheet.getRange(row, 8).setValue(repositoryName);
+  sheet.getRange(row, 9).setValue(`=REGEXMATCH(B${row}, '分析設定'!$E$3)`);
+  sheet.getRange(row, 10).setValue(`=REGEXMATCH(B${row}, '分析設定'!$E$4)`);
+  sheet.getRange(row, 11).setValue(formatDate(updatedAt));
+  sheet.getRange(row, 12).setValue(`${repositoryName}/${pullRequest.number}`);
 }
 
 function getPullRequests(repositoryName, updatedFrom = null) {
@@ -265,6 +299,7 @@ function getPullRequests(repositoryName, updatedFrom = null) {
             endCursor
           }
           nodes {
+            number 
             author {
               login
             }
@@ -308,7 +343,7 @@ function getPullRequests(repositoryName, updatedFrom = null) {
     after = ', after: "' + json.data.repository.pullRequests.pageInfo.endCursor + '"';
   }
 
-  return resultPullRequests;
+  return resultPullRequests.reverse(); // The reverse() occurs javascript runtime error in GAS debug mode.
 }
 
 function formatDate(date) {

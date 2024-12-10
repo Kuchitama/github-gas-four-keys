@@ -1,4 +1,5 @@
 interface PullRequest {
+  id: int
   author: {
     login: string;
   };
