@@ -53,7 +53,7 @@ describe('getPullRequests', () => {
 
   test('正常にPRを取得できる場合', async () => {
     const mockPRData: PullRequest = {
-      id: 1,
+      number: 1,
       author: { login: 'testUser' },
       headRefName: 'feature/test',
       bodyText: 'Test PR',
@@ -102,7 +102,7 @@ describe('getPullRequests', () => {
 			updatedDate.setDate(updatedDate.getDate() - i);
 
 			return {
-        id: 101 - i,
+        number: 101 - i,
 				author: { login: 'testUser' },
 				headRefName: 'feature/test',
 				bodyText: 'Test PR',
@@ -195,7 +195,7 @@ describe('getPullRequests', () => {
                 hasNextPage: false
               },
               nodes: [{
-                id: 1,
+                number: 1,
                 author: { login: 'testUser' },
                 headRefName: 'feature/test',
                 bodyText: 'Test PR',
@@ -210,7 +210,7 @@ describe('getPullRequests', () => {
                 },
                 updatedAt: '2024-01-01T00:00:00Z',
               }, {
-                id: 2,
+                number: 2,
                 author: { login: 'testUser' },
                 headRefName: 'feature/test',
                 bodyText: 'Test PR',
@@ -249,7 +249,7 @@ describe('getPullRequests', () => {
 			updatedDate.setDate(updatedDate.getDate() - i);
 
 			return {
-        id: 101 - i,
+        number: 101 - i,
 				author: { login: 'testUser' },
 				headRefName: 'feature/test',
 				bodyText: 'Test PR',
