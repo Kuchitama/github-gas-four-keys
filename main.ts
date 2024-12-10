@@ -1,6 +1,8 @@
+import { PullRequest } from "./types/main";
+
 const githubEndpoint = "https://api.github.com/graphql";
 
-const repositoryNames = JSON.parse(PropertiesService.getScriptProperties().getProperty("GITHUB_REPO_NAMES"));
+const repositoryNames = JSON.parse(PropertiesService.getScriptProperties().getProperty("GITHUB_REPO_NAMES") || "");
 const repositoryOwner = PropertiesService.getScriptProperties().getProperty("GITHUB_REPO_OWNER");
 const githubAPIKey = PropertiesService.getScriptProperties().getProperty("GITHUB_API_TOKEN");
 
@@ -210,6 +212,9 @@ function getAllRepos() {
     // ToDo: Get latest updatedAt
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(`プルリク情報`);
+    if (sheet === null) {
+      throw new Error("Cannot find プルリク情報")
+    }
 
     const updates = getVerticalValues(sheet, 'K', { head: 2 , last: 0});
 
@@ -255,11 +260,11 @@ function getVerticalValues(sheet, colChar, opt={head: 0, last:0}) {
 }
 
 function upsertPullRequestData(pullRequest, sheet, row, repositoryName) {
-  let firstCommitDate = null;
+  let firstCommitDate: Date | null = null;
   if (pullRequest.commits.nodes[0].commit.committedDate) {
     firstCommitDate = new Date(pullRequest.commits.nodes[0].commit.committedDate);
   }
-  let mergedAt = null;
+  let mergedAt: Date | null = null;
   if (pullRequest.mergedAt) {
     mergedAt = new Date(pullRequest.mergedAt);
   }
@@ -282,7 +287,7 @@ function upsertPullRequestData(pullRequest, sheet, row, repositoryName) {
   sheet.getRange(row, 12).setValue(`${repositoryName}/${pullRequest.number}`);
 }
 
-function getPullRequests(repositoryName, updatedFrom = null) {
+function getPullRequests(repositoryName: string, updatedFrom: Date | null = null): PullRequest[] {
   const  fetchSizeLimit = 100
   /*
    指定したリポジトリから全てのPRを抽出する.
@@ -319,14 +324,14 @@ function getPullRequests(repositoryName, updatedFrom = null) {
         }
       }
     }`;
-    const option = {
+    const option: GoogleAppsScript.URL_Fetch.URLFetchRequestOptions = {
       method: 'post',
       contentType: 'application/json',
       headers: {
         Authorization: 'bearer ' + githubAPIKey
       },
       payload: JSON.stringify({query: graphql}),
-    };
+    } ;
     const res = UrlFetchApp.fetch(githubEndpoint, option);
     const json = JSON.parse(res.getContentText());
     // filter by updatedAt with updatedFrom
@@ -364,4 +369,4 @@ function getOrCreateSheet(sheetName) {
 }
 
 // Export functions for testing
-module.exports = { getAllRepos, getPullRequests };
+export { getAllRepos, getPullRequests };
