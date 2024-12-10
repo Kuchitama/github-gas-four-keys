@@ -20,17 +20,6 @@ const mockUrlFetchApp: GoogleAppsScript.URL_Fetch.UrlFetchApp = {
 	fetch: jest.fn()
 } as unknown as GoogleAppsScript.URL_Fetch.UrlFetchApp;
 
-
-const mockProperty = {
-	deleteAllProperties: jest.fn(),
-	deleteProperty: jest.fn(),
-	getKeys: jest.fn(),
-	getProperties: jest.fn(),
-	getProperty: jest.fn(),
-	setProperties: jest.fn(),
-	setProperty: jest.fn(),
-} as GoogleAppsScript.Properties.Properties;
-
 const mockPropertiesService = {
 	getScriptProperties: jest.fn().mockReturnValue({
 		getProperty: jest.fn((key: string) => {
@@ -56,7 +45,6 @@ import {
   getPullRequests,
   getAllRepos,
 } from '../main';
-import { mock } from 'node:test';
 
 describe('getPullRequests', () => {
   beforeEach(() => {
@@ -65,6 +53,7 @@ describe('getPullRequests', () => {
 
   test('正常にPRを取得できる場合', async () => {
     const mockPRData: PullRequest = {
+      id: 1,
       author: { login: 'testUser' },
       headRefName: 'feature/test',
       bodyText: 'Test PR',
@@ -76,7 +65,8 @@ describe('getPullRequests', () => {
             committedDate: '2024-01-01T00:00:00Z'
           }
         }]
-      }
+      },
+      updatedAt: '2024-01-01T00:00:00Z',
     };
 
     const mockResponse = {
@@ -109,9 +99,10 @@ describe('getPullRequests', () => {
 	test('100件以上のPRを取得する場合', async () => {
     const mockPRData: PullRequest[] = Array.from({length: 100}).map((_, i: number) => {
 			const updatedDate = new Date()
-			updatedDate.setDate(updatedDate.getDate() - 100 + i);
+			updatedDate.setDate(updatedDate.getDate() - i);
 
 			return {
+        id: 101 - i,
 				author: { login: 'testUser' },
 				headRefName: 'feature/test',
 				bodyText: 'Test PR',
@@ -123,7 +114,8 @@ describe('getPullRequests', () => {
 							committedDate: updatedDate.toISOString()
 						}
 					}]
-				}
+				},
+        updatedAt: '2024-01-01T00:00:00Z',
 			}
     });
 
@@ -162,7 +154,8 @@ describe('getPullRequests', () => {
 											committedDate: new Date().toISOString()
 										}
 									}]
-								}
+								},
+								updatedAt: new Date().toISOString(),
 							}] 
             }
           }
@@ -192,21 +185,132 @@ describe('getPullRequests', () => {
     );
   });
 
+  test('updatedFrom以降のPRを返却する', () => {
+    const mockResponse = {
+      getContentText: () => JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: {
+                hasNextPage: false
+              },
+              nodes: [{
+                id: 1,
+                author: { login: 'testUser' },
+                headRefName: 'feature/test',
+                bodyText: 'Test PR',
+                merged: true,
+                mergedAt: '2024-01-01T00:00:00Z',
+                commits: {
+                  nodes: [{
+                    commit: {
+                      committedDate: '2024-01-01T00:00:00Z'
+                    }
+                  }]
+                },
+                updatedAt: '2024-01-01T00:00:00Z',
+              }, {
+                id: 2,
+                author: { login: 'testUser' },
+                headRefName: 'feature/test',
+                bodyText: 'Test PR',
+                merged: true,
+                mergedAt: '2024-01-02T00:00:00Z',
+                commits: {
+                  nodes: [{
+                    commit: {
+                      committedDate: '2024-01-02T00:00:00Z'
+                    }
+                  }]
+                },
+                updatedAt: '2024-01-02T00:00:00Z',
+              }] as PullRequest[]
+            }
+          }
+        }
+      })
+    };
+
+    const fetchFn = (mockUrlFetchApp.fetch as jest.Mock);
+    fetchFn.mockReturnValue(mockResponse);
+
+    const updatedFrom = new Date('2024-01-01T00:00:00Z');
+
+    const result = getPullRequests('test-repo', updatedFrom);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].author.login).toBe('testUser');
+    expect(new Date(result[0].updatedAt).getTime()).toBeGreaterThan(updatedFrom.getTime());
+  })
+
+  test('100件以上のPRがあるが、updatedFromで取得件数を絞る場合', async () => {
+    const mockPRData: PullRequest[] = Array.from({length: 100}).map((_, i: number) => {
+			const updatedDate = new Date()
+			updatedDate.setDate(updatedDate.getDate() - i);
+
+			return {
+        id: 101 - i,
+				author: { login: 'testUser' },
+				headRefName: 'feature/test',
+				bodyText: 'Test PR',
+				merged: true,
+				mergedAt: updatedDate.toISOString(),
+				commits: {
+					nodes: [{
+						commit: {
+							committedDate: updatedDate.toISOString()
+						}
+					}]
+				},
+				updatedAt: updatedDate.toISOString(),
+			}
+    });
+
+    const mockResponse1 = {
+      getContentText: () => JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: {
+                hasNextPage: true, // There are more than 100 PRs
+								endCursor: 100,
+              },
+              nodes: mockPRData
+            }
+          }
+        }
+      })
+    };
+
+		const fetchFn = (mockUrlFetchApp.fetch as jest.Mock)
+    fetchFn.mockReturnValueOnce(mockResponse1);
+
+    // get from 3days ago
+    const updatedFrom = new Date();
+    updatedFrom.setDate(updatedFrom.getDate() - 3);
+
+    const result = getPullRequests('test-repo', updatedFrom);
+
+		// Check the number of fetch calls
+		expect(fetchFn.mock.calls).toHaveLength(1);
+    expect(result).toHaveLength(3);
+  });
 });
 
 describe('getAllRepos', () => {
+  const mockSetValue = jest.fn();
+  const mockValues = jest.fn().mockReturnValue([['2023-01-01T00:00:00Z','2023-12-31T00:00:00Z','2023-06-01T00:00:00Z']]);
+  const mockSheet = {
+      getRange: jest.fn().mockReturnValue({
+        setValue: mockSetValue,
+        getValues: mockValues,
+      })
+    };
   beforeEach(() => {
     jest.clearAllMocks();
-
   });
 
   test('全リポジトリのPRを取得してスプレッドシートに書き込む', () => {
-		const mockSetValue = jest.fn();
-    const mockSheet = {
-      getRange: jest.fn().mockReturnValue({
-        setValue: mockSetValue
-      })
-    };
     (mockSpreadsheetApp.getActiveSpreadsheet().getSheetByName as jest.Mock).mockReturnValue(mockSheet);
 
     const mockPRResponse = {
@@ -229,7 +333,8 @@ describe('getAllRepos', () => {
                       committedDate: '2024-01-01T00:00:00Z'
                     }
                   }]
-                }
+                },
+                updatedAt: '2024-01-01T00:00:00Z',
               }]
             }
           }
@@ -246,7 +351,65 @@ describe('getAllRepos', () => {
 		expect((fetchFn.mock.calls[0][1] as any).payload).toContain('repository(name: \\\"repo1\\\"');
 		expect((fetchFn.mock.calls[1][1] as any).payload).toContain('repository(name: \\\"repo2\\\"');
 
-    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(20);
-    expect(mockSetValue.mock.calls.length).toBe(20);
+    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(28);
+    expect(mockSetValue.mock.calls.length).toBe(24);
+  });
+
+  test('PRの最終更新日時を考慮してPRを取り込む', () => {
+    (mockSpreadsheetApp.getActiveSpreadsheet().getSheetByName as jest.Mock).mockReturnValue(mockSheet);
+
+    const mockPRResponse = {
+      getContentText: () => JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: {
+              pageInfo: {
+                hasNextPage: false
+              },
+              nodes: [{
+                author: { login: 'testUser' },
+                headRefName: 'feature/test',
+                bodyText: 'Test PR',
+                merged: true,
+                mergedAt: '2024-01-02T00:00:00Z',
+                commits: {
+                  nodes: [{
+                    commit: {
+                      committedDate: '2024-01-02T00:00:00Z'
+                    }
+                  }]
+                },
+                updatedAt: '2024-01-02T00:00:00Z',
+              }, {
+                author: { login: 'testUser' },
+                headRefName: 'feature/test',
+                bodyText: 'Test PR',
+                merged: true,
+                mergedAt: '2023-01-01T00:00:00Z',
+                commits: {
+                  nodes: [{
+                    commit: {
+                      committedDate: '2023-01-01T00:00:00Z'
+                    }
+                  }]
+                },
+                updatedAt: '2023-01-01T00:00:00Z',
+              }]
+            }
+          }
+        }
+      })
+    };
+
+		const fetchFn = mockUrlFetchApp.fetch as jest.Mock;
+    fetchFn.mockReturnValue(mockPRResponse);
+
+    getAllRepos();
+
+    expect(mockUrlFetchApp.fetch).toHaveBeenCalled();
+		expect((fetchFn.mock.calls[0][1] as any).payload).toContain('repository(name: \\\"repo1\\\"');
+
+    // 最終更新日時='2024-01-01T00:00:00Z' として、それ以降の1件のみ更新する
+    expect(mockSetValue.mock.calls.length).toBe(24);
   });
 });

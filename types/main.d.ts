@@ -1,4 +1,5 @@
 interface PullRequest {
+  id: int
   author: {
     login: string;
   };
@@ -13,6 +14,7 @@ interface PullRequest {
       };
     }>;
   };
+  updatedAt: string;
 }
 
 export { PullRequest };
