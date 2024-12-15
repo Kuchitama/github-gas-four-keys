@@ -1,7 +1,4 @@
-// interface ISheet {
-//   readonly sheet: GoogleAppsScript.Spreadsheet.Sheet;
-//   readonly sheetName: string;
-// }
+import { PullRequest } from "../types/main";
 
 abstract class Sheet {
   abstract sheet: GoogleAppsScript.Spreadsheet.Sheet;
@@ -10,6 +7,22 @@ abstract class Sheet {
 
   protected getOrCreateSheet(sheetName: string): GoogleAppsScript.Spreadsheet.Sheet {
     return Sheet.defaultSheet.getSheetByName(sheetName) || Sheet.defaultSheet.insertSheet(sheetName);
+  }
+
+  /** 
+   * get vertical values array from range(Value[n][0]) 
+   * args 
+   *    colChar: column index. e.g. 'A'
+   *    opt: Row range option.
+   * return Value[]
+  */
+  getVerticalValues(colChar, opt={head: 0, last:0}) {
+    const head = opt.head || 0;
+    const last = opt.last || 0;
+    const start = head === 0 ? colChar : `${colChar}${head}`;
+    const end = last <= 0 ? colChar : `${colChar}${last}`
+
+    return this.sheet.getRange(`${start}:${end}`).getValues().map((vs, _) => vs[0]);
   }
 }
 
@@ -201,3 +214,97 @@ export class FourKeysSheet extends Sheet {
   }
 
 }
+
+export class PullRequestsSheet extends Sheet {
+  public static readonly sheetName: string = "プルリク情報";
+  readonly sheet: GoogleAppsScript.Spreadsheet.Sheet;
+
+  constructor() {
+    super();
+    this.sheet = this.getOrCreateSheet(PullRequestsSheet.sheetName);
+  }
+
+  public initialize(): void {
+    this.sheet.getRange(1, 1, 1, 12)
+      .setValues([[
+        "メンバー名",
+        "ブランチ名",
+        "PR本文",
+        "マージ済",
+        "初コミット日時",
+        "マージ日時",
+        "マージまでの時間(hours)",
+        "リポジトリ",
+        "障害発生判定",
+        "障害対応PR",
+        "更新日時",
+        "id",
+      ]])
+      .setBackgroundRGB(224, 224, 224);   
+  } 
+
+  upsertPullRequest(repositoryName: string, pullRequest: PullRequest) {
+    const row = this.findRowByPullRequest(repositoryName, pullRequest);
+
+    this.writePullRequestData(pullRequest, row, repositoryName);
+  }
+
+  private writePullRequestData(pullRequest: PullRequest, row: number, repositoryName: string) {
+    let firstCommitDate: Date | null = null;
+    if (pullRequest.commits.nodes[0].commit.committedDate) {
+      firstCommitDate = new Date(pullRequest.commits.nodes[0].commit.committedDate);
+    }
+    let mergedAt: Date | null = null;
+    if (pullRequest.mergedAt) {
+      mergedAt = new Date(pullRequest.mergedAt);
+    }
+
+    const updatedAt = new Date(pullRequest.updatedAt);
+    this.sheet.getRange(row, 1).setValue(pullRequest.author.login);
+    this.sheet.getRange(row, 2).setValue(pullRequest.headRefName);
+    this.sheet.getRange(row, 3).setValue(pullRequest.bodyText);
+    this.sheet.getRange(row, 4).setValue(pullRequest.merged);
+    this.sheet.getRange(row, 5).setValue(!!firstCommitDate ? this.formatDate(firstCommitDate) : "");
+    this.sheet.getRange(row, 6).setValue(!!mergedAt ? this.formatDate(mergedAt) : "");
+    this.sheet.getRange(row, 7).setValue(
+      (!!firstCommitDate && !!mergedAt) ?
+        (mergedAt.getTime() - firstCommitDate.getTime()) / 60 / 60 / 1000 :
+        "");
+    this.sheet.getRange(row, 8).setValue(repositoryName);
+    this.sheet.getRange(row, 9).setValue(`=REGEXMATCH(B${row}, '分析設定'!$E$3)`);
+    this.sheet.getRange(row, 10).setValue(`=REGEXMATCH(B${row}, '分析設定'!$E$4)`);
+    this.sheet.getRange(row, 11).setValue(this.formatDate(updatedAt));
+    this.sheet.getRange(row, 12).setValue(`${repositoryName}/${pullRequest.number}`);
+  }
+
+  /**
+   * 
+   * @param repositoryName The name of the repository
+   * @param pullRequest The pull request object
+   * @returns The row number of the pull request. If the pull request is not found, it returns the least row number of empty.
+   */
+  private findRowByPullRequest(repositoryName: string, pullRequest: PullRequest) {
+    const prIds = this.getVerticalValues('L', {head: 2, last: 0});
+
+    const last = prIds.filter((id, _) => id !== null && id !== undefined && id !== "").length;
+
+    const index = prIds.findIndex((id, _) => id === `${repositoryName}/${pullRequest.number}`);
+    return index > 0 ? index + 2: last + 2;
+  } 
+
+  /**
+   * 日付フォーマットヘルパ関数
+   * 
+   * @param date 
+   * @returns formated string ${year}-${month}-${day} ${hour}:${minute}:${second} 
+   */
+  private formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hour = date.getHours().toString().padStart(2, '0');
+    const minute = date.getMinutes().toString().padStart(2, '0');
+    const second = date.getSeconds().toString().padStart(2, '0');
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  }
+} 
