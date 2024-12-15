@@ -351,7 +351,7 @@ describe('getAllRepos', () => {
 		expect((fetchFn.mock.calls[0][1] as any).payload).toContain('repository(name: \\\"repo1\\\"');
 		expect((fetchFn.mock.calls[1][1] as any).payload).toContain('repository(name: \\\"repo2\\\"');
 
-    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(28);
+    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(27);
     expect(mockSetValue.mock.calls.length).toBe(24);
   });
 
