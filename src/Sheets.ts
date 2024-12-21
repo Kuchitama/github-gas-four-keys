@@ -1,22 +1,25 @@
 import { PullRequest } from "../types/main";
 
-abstract class Sheet {
+type Values = any[];
+
+export abstract class Sheet {
   abstract sheet: GoogleAppsScript.Spreadsheet.Sheet;
   public static sheetName: string;
   public static readonly defaultSheet: GoogleAppsScript.Spreadsheet.Spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  public static readonly existValueFilter = (val: any) => val !== null && val !== undefined && val !== "";
 
   protected getOrCreateSheet(sheetName: string): GoogleAppsScript.Spreadsheet.Sheet {
     return Sheet.defaultSheet.getSheetByName(sheetName) || Sheet.defaultSheet.insertSheet(sheetName);
   }
 
-  /** 
-   * get vertical values array from range(Value[n][0]) 
-   * args 
-   *    colChar: column index. e.g. 'A'
-   *    opt: Row range option.
-   * return Value[]
+  /**
+  * get vertical values array from range(Value[n][0]) 
+  * 
+  * @param colChar column index. e.g. 'A' 
+  * @param opt Row range option. The range starts the first row if head is 0. The range ends the last row if last is 0. e.g. {head: 0, last: 0} 
+  * @returns Values array of the range value
   */
-  getVerticalValues(colChar, opt={head: 0, last:0}) {
+  getVerticalValues(colChar, opt={head: 0, last:0}): Values {
     const head = opt.head || 0;
     const last = opt.last || 0;
     const start = head === 0 ? colChar : `${colChar}${head}`;
@@ -283,14 +286,12 @@ export class PullRequestsSheet extends Sheet {
    * @param pullRequest The pull request object
    * @returns The row number of the pull request. If the pull request is not found, it returns the least row number of empty.
    */
-  private findRowByPullRequest(repositoryName: string, pullRequest: PullRequest) {
-    const prIds = this.getVerticalValues('L', {head: 2, last: 0});
-
-    const last = prIds.filter((id, _) => id !== null && id !== undefined && id !== "").length;
+  private findRowByPullRequest(repositoryName: string, pullRequest: PullRequest): number {
+    const prIds = this.getVerticalValues('L', {head: 2, last: 0}).filter(Sheet.existValueFilter);
 
     const index = prIds.findIndex((id, _) => id === `${repositoryName}/${pullRequest.number}`);
-    return index > 0 ? index + 2: last + 2;
-  } 
+    return index > 0 ? index + 2: prIds.length + 2;
+  }
 
   /**
    * 日付フォーマットヘルパ関数
