@@ -38,7 +38,7 @@ export class SettingsSheet extends Sheet {
     this.sheet = this.getOrCreateSheet(SettingsSheet.sheetName);
   }
 
-  public initialize(pullRequestsSheetName: string): void {
+  public initialize(pullRequestsSheetName: string, repos: string[]): void {
     this.sheet.getRange(1, 1, 2, 2)
       .setValues([
         ["集計メンバー", "集計可否(TRUEかFALSEを入力してください)"],
@@ -70,7 +70,27 @@ export class SettingsSheet extends Sheet {
         ["平均修復時間のHigh判定条件(修復PRが初コミットからマージされるまで平均N時間以内ならHigh)", "168"],
         ["平均修復時間のMeidum定条件(修復PRが初コミットからマージされるまで平均N時間以内ならMedium", "720"],
       ]);
+
+    this.sheet.getRange(1, 7, 1, 2)
+      .setValues([
+        ["リポジトリ", "最終更新日時"],
+      ])
+      .setBackgroundRGB(224, 224, 224);
+
+    this.sheet.getRange(2, 7, repos.length, 2)
+      .setValues(repos.map((repo, i) => [repo, `=IF(MAXIFS('プルリク情報'!K2:K, 'プルリク情報'!H2:H, G${i+2})=0, "", TEXT(MAXIFS('プルリク情報'!K2:K, 'プルリク情報'!H2:H, G${i+2}), "yyyy-mm-dd HH:MM:SS"))`]))
   }
+
+  getLatestUpdatedAt(repo: string): Date | null {
+    const repoIdx = this.getVerticalValues('G', {head: 2, last: 0}).findIndex((val, _) => val === repo);
+    const dateStr = this.sheet.getRange(repoIdx + 2, 8).getValue();
+    if (!Sheet.existValueFilter(dateStr)) {
+      return null;
+    }
+    return new Date(dateStr);
+  }
+
+
 }
 
 export class FourKeysSheet extends Sheet {
