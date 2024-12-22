@@ -282,6 +282,12 @@ export class PullRequestsSheet extends Sheet {
       mergedAt = new Date(pullRequest.mergedAt);
     }
 
+    // SpreadSheetの1カラムあたり5000文字までしか入らないため、長いPR本文は切り捨てる
+    const maxBodyLength = 1000;
+    if (pullRequest.bodyText.length > maxBodyLength) {
+      pullRequest.bodyText = pullRequest.bodyText.substring(0, maxBodyLength) + "...";
+    }
+
     const updatedAt = new Date(pullRequest.updatedAt);
     this.sheet.getRange(row, 1).setValue(pullRequest.author.login);
     this.sheet.getRange(row, 2).setValue(pullRequest.headRefName);
