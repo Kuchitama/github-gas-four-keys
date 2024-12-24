@@ -1,5 +1,5 @@
 import { PullRequest } from "./types/main";
-import { FourKeysSheet, PullRequestsSheet, SettingsSheet } from "./src/Sheets";
+import { Sheet, FourKeysSheet, PullRequestsSheet, SettingsSheet } from "./src/Sheets";
 
 const githubEndpoint = "https://api.github.com/graphql";
 
@@ -7,12 +7,10 @@ const repositoryNames = JSON.parse(PropertiesService.getScriptProperties().getPr
 const repositoryOwner = PropertiesService.getScriptProperties().getProperty("GITHUB_REPO_OWNER");
 const githubAPIKey = PropertiesService.getScriptProperties().getProperty("GITHUB_API_TOKEN");
 
-const defaultSheet = SpreadsheetApp.getActiveSpreadsheet();
-
 function initialize() {
 
   new PullRequestsSheet().initialize();
-  new SettingsSheet().initialize(PullRequestsSheet.sheetName);
+  new SettingsSheet().initialize(PullRequestsSheet.sheetName, repositoryNames);
   new FourKeysSheet().initialize(PullRequestsSheet.sheetName);
   
   ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === "getAllRepos").forEach(t => ScriptApp.deleteTrigger(t));
@@ -25,17 +23,16 @@ function initialize() {
 function getAllRepos() {
   // Get latest updatedAt
   const pullRequestsSheet = new PullRequestsSheet();
-
-  const updates = pullRequestsSheet.getVerticalValues('K', { head: 2 , last: 0});
-
-  const latestUpdated = (updates.length > 0) ? new Date(updates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]) : null; 
-  if ( latestUpdated === null ) {
-    console.log(`get all PRs`);
-  } else {
-    console.log(`get PRs from ${latestUpdated.toISOString()}`);
-  }
+  const settingsSheet = new SettingsSheet();
 
   repositoryNames.forEach((repositoryName) => {
+    const latestUpdated = settingsSheet.getLatestUpdatedAt(repositoryName);
+    if ( latestUpdated === null ) {
+      console.log(`get all PRs`);
+    } else {
+      console.log(`get PRs from ${latestUpdated.toISOString()}`);
+    }
+
     const pullRequests: PullRequest[] =  getPullRequests(repositoryName, latestUpdated);
 
     pullRequests.forEach(pullRequest => pullRequestsSheet.upsertPullRequest(repositoryName, pullRequest));

@@ -300,10 +300,11 @@ describe('getPullRequests', () => {
 describe('getAllRepos', () => {
   const mockSetValue = jest.fn();
   const mockValues = jest.fn().mockReturnValue([['2023-01-01T00:00:00Z','2023-12-31T00:00:00Z','2023-06-01T00:00:00Z']]);
-  const mockSheet = {
+  let mockSheet = {
       getRange: jest.fn().mockReturnValue({
         setValue: mockSetValue,
         getValues: mockValues,
+        getValue: jest.fn().mockReturnValue(""),
       })
     };
   beforeEach(() => {
@@ -351,11 +352,20 @@ describe('getAllRepos', () => {
 		expect((fetchFn.mock.calls[0][1] as any).payload).toContain('repository(name: \\\"repo1\\\"');
 		expect((fetchFn.mock.calls[1][1] as any).payload).toContain('repository(name: \\\"repo2\\\"');
 
-    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(27);
+    expect((mockSheet.getRange as jest.Mock).mock.calls.length).toBe(30);
     expect(mockSetValue.mock.calls.length).toBe(24);
   });
 
   test('PRの最終更新日時を考慮してPRを取り込む', () => {
+    const mockSheet = {
+        getRange: jest.fn().mockReturnValue({
+        setValue: mockSetValue,
+        getValues: mockValues,
+        // 最終更新日時='2024-01-01T00:00:00Z' とするため +9時間(JST)する
+        getValue: jest.fn().mockReturnValue("2024-01-01 09:00:00"),
+      })
+    };
+
     (mockSpreadsheetApp.getActiveSpreadsheet().getSheetByName as jest.Mock).mockReturnValue(mockSheet);
 
     const mockPRResponse = {

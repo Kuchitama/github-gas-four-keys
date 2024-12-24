@@ -7,9 +7,14 @@ const mockSpreadsheetApp: GoogleAppsScript.Spreadsheet.SpreadsheetApp = {
   }),
 } as unknown as GoogleAppsScript.Spreadsheet.SpreadsheetApp;
 
+const mockGetValue = jest.fn();
+const mockGetValues = jest.fn();
+
 const mockGetRange = {
   setValues: jest.fn().mockReturnThis(),
   setBackgroundRGB: jest.fn().mockReturnThis(),
+  getValue: mockGetValue,
+  getValues: mockGetValues,
 }
 
 const mockSheet = {
@@ -50,8 +55,29 @@ describe('SettingsSheet', () => {
     (mockSpreadsheetApp.getActiveSpreadsheet().getSheetByName as jest.Mock).mockReturnValue(mockSheet);
 
     const settingsSheet = new SettingsSheet();
-    settingsSheet.initialize('PullRequests');
+    settingsSheet.initialize('PullRequests', ['repo1', 'repo2']);
 
     expect(mockGetRange.setValues).toHaveBeenCalled();
+  });
+
+  test('getLatestUpdatedAt should return null if the date string is empty', () => {
+    (mockGetValue as jest.Mock).mockReturnValue('');
+    (mockGetValues as jest.Mock).mockReturnValue([['repo1'], ['repo2']]);
+
+    const settingsSheet = new SettingsSheet();
+    const result = settingsSheet.getLatestUpdatedAt('repo1');
+
+    expect(result).toBeNull();
+  });
+
+  test('getLatestUpdatedAt should return the correct date for the correct repository', () => {
+    const dateStr = '2024-01-01 00:00:00';
+    (mockGetValue as jest.Mock).mockReturnValueOnce(dateStr);
+    (mockGetValues as jest.Mock).mockReturnValue([['repo1'], ['repo2']]);
+
+    const result = new SettingsSheet().getLatestUpdatedAt('repo1');
+
+    expect(result).toEqual(new Date(dateStr));
+    expect(mockSheet.getRange).toHaveBeenCalledWith(2, 8);
   });
 });
